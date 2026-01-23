@@ -1,0 +1,95 @@
+/* Phone Input Styles */
+.phone-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.phone-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: #999;
+}
+
+.phone-input-container input {
+  width: 100%;
+  padding-left: 40px;
+}
+
+/* OTP Verification Styles */
+.otp-verification {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.otp-verification h3 {
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.otp-verification p {
+  margin-bottom: 1.5rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.otp-inputs {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.otp-input {
+  width: 45px;
+  height: 45px;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-color: #4facfe;
+  box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+}
+
+.otp-input:valid {
+  border-color: #4caf50;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .otp-inputs {
+    gap: 0.3rem;
+  }
+  
+  .otp-input {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .otp-inputs {
+    gap: 0.2rem;
+  }
+  
+  .otp-input {
+    width: 35px;
+    height: 35px;
+    font-size: 0.9rem;
+  }
+}

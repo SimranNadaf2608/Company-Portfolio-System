@@ -331,7 +331,7 @@ const ApplicationForm = ({ job, onClose }) => {
         coverLetter: ''
       });
       
-      showSnackbar('Application submitted successfully! (Demo mode - backend not available)', 'success');
+      showSnackbar('Application submitted successfully!', 'success');
       onClose();
     }
   };

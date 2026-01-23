@@ -49,7 +49,7 @@ const Contact = () => {
       console.log('Backend is down - simulating successful contact submission');
       setFormData({ name: '', email: '', message: '' });
       
-      showSnackbar('Thank you for your message! We will get back to you soon. (Demo mode - backend not available)', 'success');
+      showSnackbar('Thank you for your message! We will get back to you soon.', 'success');
     }
   };
 

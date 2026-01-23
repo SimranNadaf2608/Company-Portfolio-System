@@ -51,14 +51,6 @@ const Portfolio = () => {
       technologies: ["React", "Python", "Django", "AWS"],
       category: "Web Development",
       featured: false
-    },
-    {
-      title: "Real Estate Platform",
-      description: "Property listing and management platform with virtual tours and advanced search",
-      image: "https://picsum.photos/400/250?random=7",
-      technologies: ["Next.js", "Prisma", "PostgreSQL", "Mapbox"],
-      category: "Web Development",
-      featured: false
     }
   ];
 
@@ -183,7 +175,7 @@ const Portfolio = () => {
         </div>
       </section>
 
-      <section className="section cta">
+      {/* <section className="section cta">
         <div className="container">
           <motion.div 
             className="cta-content"
@@ -201,7 +193,7 @@ const Portfolio = () => {
             </div>
           </motion.div>
         </div>
-      </section>
+      </section> */}
 
       <footer className="footer">
         <div className="container">

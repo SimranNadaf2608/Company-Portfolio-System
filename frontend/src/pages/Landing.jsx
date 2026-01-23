@@ -209,6 +209,34 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="container">
+          <div className="footer-content">
+            <div className="footer-section">
+              <h3>PthinkS</h3>
+              <p>Building the future of technology</p>
+            </div>
+            <div className="footer-section">
+              <h4>Quick Links</h4>
+              <ul>
+                <li><a href="/about">About Us</a></li>
+                <li><a href="/careers">Careers</a></li>
+                <li><a href="/contact">Contact</a></li>
+              </ul>
+            </div>
+            <div className="footer-section">
+              <h4>Contact</h4>
+              <p>hello@pthinks.com</p>
+              <p>+1 (555) 123-4567</p>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <p>&copy; 2024 PthinkS. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

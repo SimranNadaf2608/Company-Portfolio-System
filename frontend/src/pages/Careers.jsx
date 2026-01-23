@@ -75,7 +75,7 @@ const Careers = () => {
   const fetchJobs = async () => {
     try {
       // Connect to PthinkS database instead of mock API
-      const response = await fetch('http://localhost:5000/api/careers');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/careers`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -281,7 +281,7 @@ const ApplicationForm = ({ job, onClose }) => {
       console.log('Submitting application for job:', job.title);
       console.log('Form data:', formData);
       
-      const response = await fetch('http://localhost:5000/api/applications', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/applications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

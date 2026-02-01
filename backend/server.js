@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
+const EmailService = require('./services/emailService');
 
 dotenv.config();
 
@@ -17,13 +18,31 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/pthinkS')
-.then(() => {
-  console.log('🔗 Connected to pthinkS database');
-}).catch((error) => {
-  console.error('❌ Database connection error:', error);
-});
+// MongoDB Connection with fallback
+const connectDB = async () => {
+  try {
+    // Try MongoDB Atlas first
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/pthinkS');
+    console.log('🔗 Connected to MongoDB Atlas database');
+  } catch (atlasError) {
+    console.log('⚠️ MongoDB Atlas connection failed, trying local MongoDB...');
+    console.log('Atlas error:', atlasError.message);
+    
+    try {
+      // Fallback to local MongoDB
+      await mongoose.connect('mongodb://localhost:27017/pthinkS');
+      console.log('🔗 Connected to local MongoDB database');
+    } catch (localError) {
+      console.log('❌ Local MongoDB connection failed, running without database...');
+      console.log('Local error:', localError.message);
+      
+      // Continue without database - forms will be logged but not saved
+      console.log('📝 Note: Contact forms and applications will be logged to console only');
+    }
+  }
+};
+
+connectDB();
 
 // Schemas
 const JobSchema = new mongoose.Schema({
@@ -80,12 +99,14 @@ const Contact = mongoose.model('Contact', ContactSchema);
 const User = mongoose.model('User', UserSchema);
 const ProjectRequest = mongoose.model('ProjectRequest', ProjectRequestSchema);
 
-// In-memory database (replace with actual database in production)
-const users = [];
+// In-memory storage for OTP only (users now stored in database)
 const otpStore = {};
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Initialize Email Service
+const emailService = new EmailService();
 
 // Email transporter configuration
 const transporter = nodemailer.createTransport({
@@ -122,8 +143,8 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // Check if user already exists
-    const existingUser = users.find(u => u.email === email);
+    // Check if user already exists in database
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
@@ -131,24 +152,22 @@ app.post('/api/auth/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const user = {
-      id: Date.now().toString(),
+    // Create user in database
+    const user = new User({
       name,
       email,
-      password: hashedPassword,
-      createdAt: new Date()
-    };
+      password: hashedPassword
+    });
 
-    users.push(user);
+    await user.save();
 
     // Generate token
-    const token = generateToken(user);
+    const token = generateToken({ id: user._id, email: user.email });
 
     res.status(201).json({
       message: 'User registered successfully',
       token,
-      user: { id: user.id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email }
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -161,8 +180,8 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
-    const user = users.find(u => u.email === email);
+    // Find user in database
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -174,12 +193,12 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user);
+    const token = generateToken({ id: user._id, email: user.email });
 
     res.json({
       message: 'Login successful',
       token,
-      user: { id: user.id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -201,10 +220,16 @@ app.post('/api/auth/send-otp', async (req, res) => {
       expiresAt: Date.now() + 5 * 60 * 1000
     };
 
-    // Send email (in production, use actual email service)
-    console.log(`OTP for ${email}: ${otp}`);
+    // Send OTP email using EmailService
+    try {
+      const emailResult = await emailService.sendOTPEmail(email, otp);
+      console.log(`✅ OTP email sent to ${email}:`, emailResult);
+    } catch (emailError) {
+      console.log('⚠️ Failed to send OTP email, falling back to console:', emailError.message);
+      console.log(`OTP for ${email}: ${otp}`);
+    }
 
-    // For demo, return OTP in response
+    // For demo, return OTP in response (remove in production)
     res.json({
       message: 'OTP sent successfully',
       otp // Remove this in production
@@ -248,7 +273,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
 });
 
 // Get current user
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     
@@ -257,14 +282,14 @@ app.get('/api/auth/me', (req, res) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = users.find(u => u.id === decoded.id);
+    const user = await User.findById(decoded.id).select('-password');
 
     if (!user) {
       return res.status(401).json({ message: 'User not found' });
     }
 
     res.json({
-      user: { id: user.id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email }
     });
   } catch (error) {
     console.error('Get user error:', error);
@@ -277,8 +302,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
 
-    // Check if user exists
-    const user = users.find(u => u.email === email);
+    // Check if user exists in database
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -292,7 +317,14 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       expiresAt: Date.now() + 5 * 60 * 1000
     };
 
-    console.log(`Password reset OTP for ${email}: ${otp}`);
+    // Send password reset email using EmailService
+    try {
+      const emailResult = await emailService.sendPasswordResetEmail(email, otp);
+      console.log(`✅ Password reset email sent to ${email}:`, emailResult);
+    } catch (emailError) {
+      console.log('⚠️ Failed to send password reset email, falling back to console:', emailError.message);
+      console.log(`Password reset OTP for ${email}: ${otp}`);
+    }
 
     res.json({
       message: 'Password reset OTP sent',
@@ -315,14 +347,15 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    // Find user
-    const user = users.find(u => u.email === email);
+    // Find user in database
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update password
+    // Update password in database
     user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
 
     // Clear OTP
     delete otpStore[email];
@@ -345,6 +378,69 @@ app.get('/api/careers', async (req, res) => {
   }
 });
 
+// Seed sample jobs (for development)
+app.post('/api/seed-jobs', async (req, res) => {
+  try {
+    // Clear existing jobs
+    await Job.deleteMany({});
+    
+    const sampleJobs = [
+      {
+        title: "Senior Frontend Developer",
+        department: "Engineering",
+        location: "Remote",
+        type: "Full-time",
+        experience: "3-5 years",
+        description: "We are looking for an experienced Frontend Developer to join our team. You will be responsible for building responsive web applications using React, TypeScript, and modern CSS frameworks."
+      },
+      {
+        title: "Backend Developer",
+        department: "Engineering", 
+        location: "Hybrid",
+        type: "Full-time",
+        experience: "2-4 years",
+        description: "Join our backend team to build scalable APIs and services. Experience with Node.js, Express, MongoDB, and cloud platforms required."
+      },
+      {
+        title: "UI/UX Designer",
+        department: "Design",
+        location: "Remote",
+        type: "Full-time", 
+        experience: "2-3 years",
+        description: "We need a creative UI/UX Designer to create beautiful and intuitive user interfaces. Proficiency in Figma, Adobe Creative Suite, and design systems required."
+      },
+      {
+        title: "DevOps Engineer",
+        department: "Infrastructure",
+        location: "On-site",
+        type: "Full-time",
+        experience: "3-6 years",
+        description: "Looking for a DevOps Engineer to manage our cloud infrastructure and CI/CD pipelines. Experience with AWS, Docker, Kubernetes, and Jenkins essential."
+      },
+      {
+        title: "Product Manager",
+        department: "Product",
+        location: "Hybrid",
+        type: "Full-time",
+        experience: "4-7 years",
+        description: "We need a Product Manager to drive product strategy and development. Strong analytical skills and experience with agile methodologies required."
+      }
+    ];
+    
+    const insertedJobs = await Job.insertMany(sampleJobs);
+    console.log(`✅ Seeded ${insertedJobs.length} sample jobs`);
+    
+    res.json({
+      message: 'Sample jobs seeded successfully',
+      count: insertedJobs.length,
+      jobs: insertedJobs
+    });
+  } catch (error) {
+    console.error('Error seeding jobs:', error);
+    res.status(500).json({ message: 'Error seeding jobs' });
+  }
+});
+
 app.post('/api/applications', async (req, res) => {
   try {
     const { name, email, phone, experience, coverLetter, jobId, jobTitle } = req.body;
@@ -362,9 +458,19 @@ app.post('/api/applications', async (req, res) => {
     await application.save();
     console.log('✅ Application saved to database:', application);
     
+    // Send email notifications
+    const emailResults = await emailService.sendApplicationNotifications(application);
+    
+    if (emailResults.success) {
+      console.log('✅ All email notifications sent successfully');
+    } else {
+      console.log('⚠️ Some email notifications failed:', emailResults);
+    }
+    
     res.status(201).json({
       message: 'Application submitted successfully',
-      application
+      application,
+      emailNotifications: emailResults
     });
   } catch (error) {
     console.error('Error saving application:', error);
@@ -377,6 +483,31 @@ app.post('/api/contact', async (req, res) => {
   try {
     const { name, email, message, subject } = req.body;
     
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.log('📝 Contact form (no DB):', { name, email, subject, message: message.substring(0, 100) + '...' });
+      
+      // Still try to send email if email service is available
+      try {
+        // Create a mock contact object for email
+        const contactData = { name, email, message, subject, createdAt: new Date() };
+        const emailResult = await emailService.sendContactNotification(contactData);
+        
+        return res.status(200).json({
+          message: 'Contact form submitted successfully (saved to console)',
+          warning: 'Database not connected - data logged to console',
+          emailNotification: emailResult
+        });
+      } catch (emailError) {
+        console.log('Email service also failed:', emailError.message);
+        return res.status(200).json({
+          message: 'Contact form submitted (logged to console only)',
+          warning: 'Database and email service not available'
+        });
+      }
+    }
+    
+    // Database is connected - save normally
     const contact = new Contact({
       name,
       email,

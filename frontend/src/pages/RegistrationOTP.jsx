@@ -102,9 +102,9 @@ const RegistrationOTP = () => {
       if (result.success) {
         console.log('OTP Verification - Success, preparing to navigate');
         if (result.userExists) {
-          showSnackbar('Account already exists! Please login with your credentials.', 'success');
+          showSnackbar('Account already exists! Redirecting to home...', 'success');
         } else {
-          showSnackbar('Registration successful! Please login with your new account.', 'success');
+          showSnackbar('Registration successful! Welcome to PthinkS!', 'success');
         }
         
         // Clear registration data
@@ -112,8 +112,8 @@ const RegistrationOTP = () => {
         
         // Add small delay to ensure snackbar shows before navigation
         setTimeout(() => {
-          console.log('OTP Verification - Navigating to login page');
-          navigate('/login');
+          console.log('OTP Verification - Navigating to home page');
+          navigate('/'); // Navigate to home page instead of login
         }, 1500);
       } else {
         showSnackbar(result.message || 'Invalid verification code', 'error');
